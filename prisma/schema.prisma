@@ -1,0 +1,42 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String    @id
+  email     String    @unique
+  createdAt DateTime  @default(now())
+  runs      TestRun[]
+}
+
+model TestRun {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  targetUrl     String
+  status        RunStatus @default(PENDING)
+  domSnapshot   Json?
+  generatedSpec Json?
+  testCode      String?   @db.Text
+  executionLog  Json?
+  a11yReport    Json?
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+}
+
+enum RunStatus {
+  PENDING
+  SCRAPING
+  GENERATING
+  EXECUTING
+  COMPLETED
+  FAILED
+}
