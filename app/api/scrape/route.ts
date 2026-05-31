@@ -7,15 +7,29 @@ import { scrapePage, ScraperError } from "@/lib/playwright/scraper";
 import { prisma } from "@/lib/db/prisma";
 
 export async function POST(req: NextRequest) {
-  // 1. Auth check — only signed-in users can trigger scrapes
-  const { userId } = await auth();
+  // 1. Auth check — Clerk in prod, dev secret bypass for smoke tests
+  let userId: string | null = null;
+  let rawBody: unknown = null;
+
+  const devSecret = req.headers.get("x-dev-secret");
+  if (
+    process.env.NODE_ENV !== "production" &&
+    devSecret === process.env.DEV_SECRET
+  ) {
+    rawBody = await req.json().catch(() => null);
+    userId = (rawBody as Record<string, string>)?.userId ?? null;
+  } else {
+    const { userId: clerkUserId } = await auth();
+    userId = clerkUserId;
+    rawBody = await req.json().catch(() => null);
+  }
+
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // 2. Parse and validate request body with Zod
-  const body = await req.json().catch(() => null);
-  const parsed = ScrapeRequestSchema.safeParse(body);
+  const parsed = ScrapeRequestSchema.safeParse(rawBody);
 
   if (!parsed.success) {
     return NextResponse.json(
