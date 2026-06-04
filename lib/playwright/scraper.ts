@@ -26,6 +26,7 @@ export async function scrapePage(url: string): Promise<DomSnapshot> {
       browser = await playwrightChromium.launch({
         headless: true,
         executablePath,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
     } else {
       // Production: use the serverless-optimized binary
