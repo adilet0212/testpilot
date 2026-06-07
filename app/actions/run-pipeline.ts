@@ -14,7 +14,7 @@ const InputSchema = z.object({
 
 export type RunPipelineResult =
   | { success: true; runId: string }
-  | { success: false; error: string };
+  | { success: false; error: string; runId?: string };
 
 export async function runPipeline(
   input: { url: string }
