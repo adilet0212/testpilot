@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { runPipeline, type RunPipelineResult } from "@/app/actions/run-pipeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Download } from "lucide-react";
 
 export function UrlForm() {
   const [url, setUrl] = useState("");
@@ -45,6 +46,12 @@ export function UrlForm() {
         <div className="rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800">
           <p className="font-medium">Tests generated successfully.</p>
           <p className="mt-1 font-mono text-xs">Run ID: {result.runId}</p>
+          <Button asChild size="sm" className="mt-3">
+            <a href={`/api/download/${result.runId}`} download>
+              <Download className="mr-2 h-4 w-4" />
+              Download Test Suite (.zip)
+            </a>
+          </Button>
         </div>
       )}
 
