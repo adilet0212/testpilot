@@ -7,7 +7,7 @@ export interface EmittedFile {
 }
 
 /**
- * Converts a validated TestSuite into .spec.ts + playwright.config.ts.
+ * Converts a validated TestSuite into Playwright .spec.ts + config files.
  * Pure function — no I/O, no DB access.
  */
 export function emitTestFiles(spec: TestSuite): EmittedFile[] {
@@ -20,7 +20,6 @@ export function emitTestFiles(spec: TestSuite): EmittedFile[] {
 // ─── Suite ────────────────────────────────────────────────────────────────────
 
 function emitSuiteFile(spec: TestSuite): string {
-  // Group test cases by their group field → nested describe blocks
   const groups = new Map<string, TestCase[]>();
   for (const tc of spec.testCases) {
     const bucket = groups.get(tc.group) ?? [];
@@ -66,7 +65,7 @@ function emitSuiteFile(spec: TestSuite): string {
 function emitTestCase(tc: TestCase): string[] {
   const lines: string[] = [];
   const fn = tc.skip ? 'test.skip' : 'test';
-  const tags = tc.tags?.length ? `  // [${tc.tags.join(', ')}]` : '';
+  const tags = tc.tags?.length ? ` // [${tc.tags.join(', ')}]` : '';
 
   if (tc.skip && tc.skipReason) {
     lines.push(`// Skip reason: ${tc.skipReason}`);
@@ -91,7 +90,6 @@ function emitStep(step: TestStep): string[] {
   const actionLine = emitAction(step);
 
   if (step.optional) {
-    // Wrap optional steps in try/catch — element may not be present
     lines.push(`try {`);
     lines.push(`  ${actionLine}`);
     if (step.assertion) lines.push(`  ${emitAssertion(step.assertion, step.locator)}`);
@@ -108,9 +106,9 @@ function emitStep(step: TestStep): string[] {
 
 function emitAction(step: TestStep): string {
   const { action, locator, value } = step;
-  // L() produces a Locator expression; placeholder keeps emitted code valid TS
+  // FIX: esc() applied to locator so embedded quotes don't break the emitted string literal
   const L = locator
-    ? `page.locator('${locator}')`
+    ? `page.locator('${esc(locator)}')`
     : `page.locator('/* TODO: locator missing */')`;
 
   switch (action) {
@@ -147,10 +145,10 @@ function emitAction(step: TestStep): string {
       if (value === 'bottom') return `await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));`;
       return locator ? `await ${L}.scrollIntoViewIfNeeded();` : `await page.evaluate(() => window.scrollTo(0, 0));`;
     case 'drag':
-      // value holds the target locator to drag to
       return `await ${L}.dragTo(page.locator('${esc(value ?? '')}'));`;
     case 'waitForSelector':
-      return `await page.waitForSelector('${locator ?? value ?? ''}');`;
+      // FIX: esc() applied so locators like h1:has-text('...') don't break the string
+      return `await page.waitForSelector('${esc(locator ?? value ?? '')}');`;
     case 'waitForURL':
       return `await page.waitForURL('${esc(value ?? '')}');`;
     case 'waitForResponse':
@@ -167,12 +165,10 @@ function emitAction(step: TestStep): string {
 // ─── Assertion emitter ────────────────────────────────────────────────────────
 
 function emitAssertion(assertion: Assertion, stepLocator?: string): string {
-  // assertion.locator overrides step locator; fall back to page for URL/title
   const locatorExpr = assertion.locator ?? stepLocator;
   const not = assertion.not ? '.not' : '';
   const { expected, expectedCount, attribute } = assertion;
 
-  // Page-scoped assertions — always use `page` regardless of locator
   if (assertion.type === 'toHaveURL') {
     return `await expect(page)${not}.toHaveURL('${esc(expected ?? '')}');`;
   }
@@ -180,7 +176,8 @@ function emitAssertion(assertion: Assertion, stepLocator?: string): string {
     return `await expect(page)${not}.toHaveTitle('${esc(expected ?? '')}');`;
   }
 
-  const target = locatorExpr ? `page.locator('${locatorExpr}')` : 'page';
+  // FIX: esc() applied to locatorExpr so has-text('...') locators don't break the string
+  const target = locatorExpr ? `page.locator('${esc(locatorExpr)}')` : 'page';
 
   switch (assertion.type) {
     case 'toBeVisible':

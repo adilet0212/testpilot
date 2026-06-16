@@ -8,7 +8,7 @@ import { emitTestFiles } from '@/lib/generator/emitter';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { runId: string } },
+  { params }: { params: Promise<{ runId: string }> },
 ) {
   // Auth — same dev-bypass pattern as your other routes
   const { userId } = await auth();
@@ -19,7 +19,7 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { runId } = params;
+  const { runId } = await params;
 
   const run = await prisma.testRun.findUnique({ where: { id: runId } });
 
