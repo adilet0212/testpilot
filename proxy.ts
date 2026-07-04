@@ -7,9 +7,11 @@ const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
   "/api/scrape(.*)",
   "/api/generate(.*)",
-  "/api/execute(.*)",
-  "/api/download(.*)",
 ]);
+
+// /api/execute and /api/download are NOT blanket-protected here — a run can be
+// isPublic (e.g. the seeded /sample run), so each route handler does its own
+// per-run ownership-or-public check via auth() instead of middleware auth.protect().
 
 export default clerkMiddleware(async (auth, req) => {
   // Allow dev secret bypass before Clerk protection

@@ -28,8 +28,11 @@ model TestRun {
   testCode      String?   @db.Text
   executionLog  Json?
   a11yReport    Json?
+  isPublic      Boolean   @default(false)
   createdAt     DateTime  @default(now())
   completedAt   DateTime?
+
+  @@index([userId, createdAt])
 }
 
 enum RunStatus {

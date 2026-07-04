@@ -1,7 +1,7 @@
 // lib/playwright/scraper.ts
 
-import { chromium as playwrightChromium } from "playwright-core";
 import type { DomSnapshot, InteractiveElement, Form } from "@/lib/schemas/scrape";
+import { launchBrowser } from "@/lib/playwright/browser";
 
 // Custom error class — per project convention, no raw string throws
 export class ScraperError extends Error {
@@ -19,24 +19,7 @@ export async function scrapePage(url: string): Promise<DomSnapshot> {
   let browser;
 
   try {
-    const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
-
-    if (executablePath) {
-      // Dev: use the path from .env.local
-      browser = await playwrightChromium.launch({
-        headless: true,
-        executablePath,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      });
-    } else {
-      // Production: use the serverless-optimized binary
-      const chromium = await import("@sparticuz/chromium");
-      browser = await playwrightChromium.launch({
-        args: chromium.default.args,
-        executablePath: await chromium.default.executablePath(),
-        headless: true,
-      });
-    }
+    browser = await launchBrowser();
 
     const context = await browser.newContext({
       userAgent:

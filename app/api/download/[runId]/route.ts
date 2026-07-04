@@ -10,14 +10,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ runId: string }> },
 ) {
-  // Auth — same dev-bypass pattern as your other routes
   const { userId } = await auth();
   const devBypass =
     req.headers.get('x-dev-secret') === process.env.DEV_SECRET;
-
-  if (!userId && !devBypass) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
 
   const { runId } = await params;
 
@@ -27,9 +22,15 @@ export async function GET(
     return NextResponse.json({ error: 'Run not found' }, { status: 404 });
   }
 
-  // Ownership check — skip for dev bypass
-  if (userId && run.userId !== userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  // Public runs (the seeded /sample demo) are downloadable by anyone.
+  // Otherwise require sign-in and ownership (or the dev-secret bypass).
+  if (!run.isPublic && !devBypass) {
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (run.userId !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
   }
 
   if (!run.generatedSpec) {

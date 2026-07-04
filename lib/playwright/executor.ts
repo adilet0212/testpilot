@@ -1,6 +1,6 @@
 // lib/playwright/executor.ts
 
-import type { Browser, Page } from "playwright-core";
+import type { Browser, Page } from "@playwright/test";
 import type { TestCase, TestStep, Assertion } from "@/lib/schemas/test-spec";
 
 // ─── Result types (shaped for SSE streaming: one TestCase in, one result out) ──
@@ -35,27 +35,8 @@ export class ExecutorError extends Error {
   }
 }
 
-// ─── Browser factory (mirrors scraper.ts dev/prod switching) ─────────────────
-
-export async function launchBrowser(): Promise<Browser> {
-  const { chromium: playwrightChromium } = await import("playwright-core");
-  const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
-
-  if (executablePath) {
-    return playwrightChromium.launch({
-      headless: true,
-      executablePath,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-  }
-
-  const chromium = await import("@sparticuz/chromium");
-  return playwrightChromium.launch({
-    args: chromium.default.args,
-    executablePath: await chromium.default.executablePath(),
-    headless: true,
-  });
-}
+// launchBrowser() now lives in lib/playwright/browser.ts (shared with scraper.ts)
+export { launchBrowser } from "./browser";
 
 // ─── Assertion runner ────────────────────────────────────────────────────────
 

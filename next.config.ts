@@ -2,7 +2,12 @@ import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // @axe-core/playwright reads axe-core's raw UMD bundle from disk and injects
+  // it verbatim into the browser page. Letting webpack/Turbopack bundle that
+  // source rewrites its `typeof module` guards and breaks it in-browser
+  // ("ReferenceError: module is not defined") — keep both packages external
+  // so Node's native require loads the file unmodified.
+  serverExternalPackages: ["@axe-core/playwright", "axe-core"],
 };
 
 export default withSentryConfig(nextConfig, {
