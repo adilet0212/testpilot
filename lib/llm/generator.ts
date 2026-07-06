@@ -37,10 +37,12 @@ function trimSnapshot(raw: unknown): unknown {
       text: el.text?.slice(0, 80),
       placeholder: el.placeholder?.slice(0, 80),
       href: el.href?.slice(0, 200),
+      hrefAttr: el.hrefAttr?.slice(0, 200),
       ariaLabel: el.ariaLabel?.slice(0, 80),
       id: el.id,
       testId: el.testId,
       name: el.name,
+      hidden: el.hidden,
     })),
     headings: snapshot.headings.slice(0, 20).map((h) => ({
       level: h.level,

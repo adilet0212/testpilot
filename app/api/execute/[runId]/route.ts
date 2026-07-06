@@ -3,23 +3,17 @@
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import type { Browser } from "@playwright/test";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { TestSuiteSchema } from "@/lib/schemas/test-spec";
+import { TestSuiteSchema, type TestCase } from "@/lib/schemas/test-spec";
 import { launchBrowser } from "@/lib/playwright/browser";
 import { executeTestCase, type TestCaseResult } from "@/lib/playwright/executor";
 import { runAccessibilityAudit } from "@/lib/playwright/a11y";
+import { MAX_LIVE_CASES } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-/**
- * Live execution is capped so a large generated suite can never blow past
- * Vercel's serverless duration limit mid-stream. The full suite is always
- * available via the ZIP download.
- */
-const MAX_LIVE_CASES = 10;
 
 function sseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -28,6 +22,56 @@ function sseEvent(event: string, data: unknown): string {
 /** Round-trips through JSON so Prisma's Json column never sees `undefined`. */
 function toJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value));
+}
+
+/**
+ * Bounds a single test case's wall-clock cost. Without this, a pathological
+ * case (several steps each hitting the per-action timeout) can run well past
+ * the loop-level budget check below — which only runs BETWEEN cases — and
+ * drag the whole request past Vercel's maxDuration, hard-killing the stream
+ * with no `done`/`error` event ever reaching the client and the DB row stuck
+ * at status EXECUTING forever.
+ */
+function withCaseTimeout(
+  promise: Promise<TestCaseResult>,
+  testCase: TestCase,
+  ms: number
+): Promise<TestCaseResult> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      resolve({
+        title: testCase.title,
+        group: testCase.group,
+        passed: false,
+        skipped: false,
+        steps: [
+          {
+            description: "Execution time budget",
+            passed: false,
+            error: `This test case exceeded ${ms / 1000}s and was aborted to keep the live run within its time budget.`,
+          },
+        ],
+        durationMs: ms,
+      });
+    }, ms);
+    promise.then(
+      (result) => {
+        clearTimeout(timer);
+        resolve(result);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve({
+          title: testCase.title,
+          group: testCase.group,
+          passed: false,
+          skipped: false,
+          steps: [{ description: "Execution error", passed: false, error: "Unexpected executor error." }],
+          durationMs: ms,
+        });
+      }
+    );
+  });
 }
 
 export async function GET(
@@ -84,11 +128,24 @@ export async function GET(
 
         const results: TestCaseResult[] = [];
         const casesToRun = spec.testCases.slice(0, MAX_LIVE_CASES);
-        const truncatedCount = spec.testCases.length - casesToRun.length;
+
+        // Wall-clock budget: maxDuration is 60s on Vercel, and a11y scan +
+        // persistence still have to happen after this loop. Stop starting new
+        // cases past the budget rather than letting the platform kill the
+        // stream mid-flight. Cases beyond the cap/budget render as "not run"
+        // rows client-side (see components/testpilot/execution-panel.tsx).
+        const startedAt = Date.now();
+        const CASE_BUDGET_MS = 40_000;
+        const PER_CASE_TIMEOUT_MS = 25_000;
 
         for (const testCase of casesToRun) {
           if (closed) break;
-          const result = await executeTestCase(testCase, browser);
+          if (Date.now() - startedAt > CASE_BUDGET_MS) break;
+          const result = await withCaseTimeout(
+            executeTestCase(testCase, browser),
+            testCase,
+            PER_CASE_TIMEOUT_MS
+          );
           results.push(result);
           safeEnqueue(sseEvent("result", result));
         }
@@ -114,18 +171,20 @@ export async function GET(
           }
         }
 
-        if (truncatedCount > 0) {
-          safeEnqueue(sseEvent("truncated", { remaining: truncatedCount }));
-        }
-
         const allPassed = results.every((r) => r.passed || r.skipped);
 
+        // A failing TEST is a normal, useful result — the run itself still
+        // COMPLETED. FAILED is reserved for pipeline/execution crashes.
+        // a11yReport uses Prisma.JsonNull (not `undefined`) when the scan
+        // failed — `undefined` tells Prisma to leave the column untouched,
+        // which would let a prior successful run's a11y data silently
+        // persist as if it were current.
         await prisma.testRun.update({
           where: { id: runId },
           data: {
             executionLog: toJson(results),
-            a11yReport: a11yReport ? toJson(a11yReport) : undefined,
-            status: allPassed ? "COMPLETED" : "FAILED",
+            a11yReport: a11yReport ? toJson(a11yReport) : Prisma.JsonNull,
+            status: "COMPLETED",
             completedAt: new Date(),
           },
         });

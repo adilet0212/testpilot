@@ -74,15 +74,18 @@ async function main() {
     console.log("  durationMs:", passResult.durationMs);
     console.log("  steps:", passResult.steps);
     console.log(
-      "  screenshotBase64 present:",
-      passResult.screenshotBase64 !== undefined
+      "  screenshotBase64 length:",
+      passResult.screenshotBase64?.length ?? 0
     );
 
     if (!passResult.passed) {
       console.error("  ✗ UNEXPECTED FAILURE — passing case should have passed");
       process.exitCode = 1;
+    } else if (!passResult.screenshotBase64) {
+      console.error("  ✗ No proof screenshot captured for passing case");
+      process.exitCode = 1;
     } else {
-      console.log("  ✓ Pass case passed as expected");
+      console.log("  ✓ Pass case passed as expected, with a proof screenshot");
     }
 
     // ── Failing case ──────────────────────────────────────────────────────────

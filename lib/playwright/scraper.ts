@@ -70,10 +70,12 @@ export async function scrapePage(url: string): Promise<DomSnapshot> {
         text?: string;
         placeholder?: string;
         href?: string;
+        hrefAttr?: string;
         ariaLabel?: string;
         id?: string;
         testId?: string;
         name?: string;
+        hidden?: boolean;
       }[] = [];
 
       document
@@ -85,6 +87,13 @@ export async function scrapePage(url: string): Promise<DomSnapshot> {
           const id = el.id || undefined;
           const testId = el.getAttribute("data-testid") ?? undefined;
           const name = el.getAttribute("name") ?? undefined;
+          // Flag elements that exist in the DOM but aren't visible at load
+          // (closed dropdowns, mobile navs) — clicking them times out.
+          const isVisible =
+            typeof (el as HTMLElement).checkVisibility === "function"
+              ? (el as HTMLElement).checkVisibility()
+              : (el as HTMLElement).offsetParent !== null;
+          const hidden = isVisible ? undefined : true;
 
           if (tag === "input") {
             results.push({
@@ -95,11 +104,13 @@ export async function scrapePage(url: string): Promise<DomSnapshot> {
               id,
               testId,
               name,
+              hidden,
             });
           } else if (tag === "a") {
             const href = (el as HTMLAnchorElement).href || undefined;
+            const hrefAttr = el.getAttribute("href") ?? undefined;
             if (text || ariaLabel) {
-              results.push({ tag, text, href, ariaLabel, id, testId });
+              results.push({ tag, text, href, hrefAttr, ariaLabel, id, testId, hidden });
             }
           } else {
             if (text || ariaLabel) {
@@ -110,6 +121,7 @@ export async function scrapePage(url: string): Promise<DomSnapshot> {
                 ariaLabel,
                 id,
                 testId,
+                hidden,
               });
             }
           }

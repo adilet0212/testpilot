@@ -20,11 +20,23 @@ export const InteractiveElementSchema = z.object({
   type: z.string().optional(), // e.g. "submit", "text", "email" (for inputs)
   text: z.string().optional(), // visible text content
   placeholder: z.string().optional(),
-  href: z.string().optional(), // for anchor tags
+  href: z.string().optional(), // for anchor tags — absolutized by the DOM (el.href)
+  /**
+   * The raw href ATTRIBUTE as written in the HTML (often relative, e.g. "/docs").
+   * Locators like a[href='...'] must match this, not the absolutized `href` —
+   * a selector built from the absolute URL will silently match nothing.
+   */
+  hrefAttr: z.string().optional(),
   ariaLabel: z.string().optional(),
   id: z.string().optional(),
   testId: z.string().optional(), // data-testid attribute if present
   name: z.string().optional(),
+  /**
+   * Set (true) only when the element is NOT visible at page load — e.g. links
+   * inside closed dropdown menus or mobile navs. Clicking these directly
+   * times out; a prior step must open the containing menu first.
+   */
+  hidden: z.boolean().optional(),
 });
 
 // A form and its fields
