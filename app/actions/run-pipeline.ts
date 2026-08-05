@@ -7,6 +7,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { scrapePage } from "@/lib/playwright/scraper";
 import { generateTestSpec } from "@/lib/llm/generator";
+import {
+  isLiveExecutionAvailable,
+  GENERATION_UNAVAILABLE_MESSAGE,
+} from "@/lib/execution-availability";
 
 const InputSchema = z.object({
   url: z.string().url("Please enter a valid URL"),
@@ -27,6 +31,13 @@ export type ProcessRunResult =
 export async function startRun(input: { url: string }): Promise<StartRunResult> {
   const { userId } = await auth();
   if (!userId) return { success: false, error: "Unauthenticated" };
+
+  // The dashboard hides the form when this is false; this is the server-side
+  // backstop so the action can't be invoked directly on a runtime that has no
+  // browser and fail with an opaque module-resolution error.
+  if (!isLiveExecutionAvailable()) {
+    return { success: false, error: GENERATION_UNAVAILABLE_MESSAGE };
+  }
 
   const parsed = InputSchema.safeParse(input);
   if (!parsed.success) {

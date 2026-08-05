@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Circle,
   Download,
+  Info,
   Loader2,
   Play,
   RotateCw,
@@ -34,6 +35,10 @@ interface ExecutionPanelProps {
   done: boolean;
   streamError: string | null;
   onExecute: () => void;
+  /** False on the serverless deployment, which can't launch a browser. */
+  liveExecutionAvailable: boolean;
+  /** Explanation rendered in place of the run button when unavailable. */
+  unavailableMessage: string;
 }
 
 export function ExecutionPanel({
@@ -45,6 +50,8 @@ export function ExecutionPanel({
   done,
   streamError,
   onExecute,
+  liveExecutionAvailable,
+  unavailableMessage,
 }: ExecutionPanelProps) {
   const expectedLive = Math.min(caseSummaries.length, liveCap);
   const passed = results.filter((r) => r.passed && !r.skipped).length;
@@ -53,26 +60,35 @@ export function ExecutionPanel({
 
   return (
     <div className="flex flex-col gap-4">
+      {!liveExecutionAvailable && (
+        <div className="flex items-start gap-2.5 rounded-lg border bg-muted/40 p-3 text-sm">
+          <Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+          <p className="text-muted-foreground">{unavailableMessage}</p>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Button onClick={onExecute} disabled={executing}>
-            {executing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Running…
-              </>
-            ) : done || results.length > 0 ? (
-              <>
-                <RotateCw className="mr-2 h-4 w-4" />
-                Re-run suite
-              </>
-            ) : (
-              <>
-                <Play className="mr-2 h-4 w-4" />
-                Run suite live
-              </>
-            )}
-          </Button>
+          {liveExecutionAvailable && (
+            <Button onClick={onExecute} disabled={executing}>
+              {executing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running…
+                </>
+              ) : done || results.length > 0 ? (
+                <>
+                  <RotateCw className="mr-2 h-4 w-4" />
+                  Re-run suite
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Run suite live
+                </>
+              )}
+            </Button>
+          )}
           {results.length > 0 && (
             <div className="text-muted-foreground flex items-center gap-3 text-sm">
               <span className="flex items-center gap-1 text-emerald-600">

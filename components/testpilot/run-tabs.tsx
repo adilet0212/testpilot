@@ -18,6 +18,8 @@ interface RunTabsProps {
   initialA11y: A11yReport | null;
   overview: ReactNode;
   codePreview: ReactNode;
+  liveExecutionAvailable: boolean;
+  unavailableMessage: string;
 }
 
 export function RunTabs({
@@ -28,6 +30,8 @@ export function RunTabs({
   initialA11y,
   overview,
   codePreview,
+  liveExecutionAvailable,
+  unavailableMessage,
 }: RunTabsProps) {
   const [results, setResults] = useState<TestCaseResult[]>(initialResults);
   const [a11y, setA11y] = useState<A11yReport | null>(initialA11y);
@@ -134,10 +138,17 @@ export function RunTabs({
           done={done}
           streamError={streamError}
           onExecute={execute}
+          liveExecutionAvailable={liveExecutionAvailable}
+          unavailableMessage={unavailableMessage}
         />
       </TabsContent>
       <TabsContent value="a11y" className="mt-4">
-        <A11yPanel report={a11y} executing={executing} />
+        <A11yPanel
+          report={a11y}
+          executing={executing}
+          liveExecutionAvailable={liveExecutionAvailable}
+          unavailableMessage={unavailableMessage}
+        />
       </TabsContent>
     </Tabs>
   );

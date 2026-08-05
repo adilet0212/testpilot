@@ -19,9 +19,17 @@ const impactStyles: Record<string, string> = {
 interface A11yPanelProps {
   report: A11yReport | null;
   executing: boolean;
+  /** False on the serverless deployment, which can't launch a browser. */
+  liveExecutionAvailable: boolean;
+  unavailableMessage: string;
 }
 
-export function A11yPanel({ report, executing }: A11yPanelProps) {
+export function A11yPanel({
+  report,
+  executing,
+  liveExecutionAvailable,
+  unavailableMessage,
+}: A11yPanelProps) {
   if (!report) {
     return (
       <div className="text-muted-foreground flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center text-sm">
@@ -31,10 +39,15 @@ export function A11yPanel({ report, executing }: A11yPanelProps) {
             The accessibility scan runs after the functional tests — results will
             appear here shortly.
           </>
-        ) : (
+        ) : liveExecutionAvailable ? (
           <>
             <Accessibility className="h-5 w-5" />
             Run the suite to generate a WCAG 2.1 accessibility report for this page.
+          </>
+        ) : (
+          <>
+            <Accessibility className="h-5 w-5" />
+            <p className="max-w-md">{unavailableMessage}</p>
           </>
         )}
       </div>

@@ -6,6 +6,10 @@ import { TestSuiteSchema } from "@/lib/schemas/test-spec";
 import { emitTestFiles } from "@/lib/generator/emitter";
 import { highlightTypeScript } from "@/lib/highlight";
 import { MAX_LIVE_CASES, RUN_STATUS_VARIANT } from "@/lib/constants";
+import {
+  isLiveExecutionAvailable,
+  LIVE_EXECUTION_UNAVAILABLE_MESSAGE,
+} from "@/lib/execution-availability";
 import type { TestCaseResult } from "@/lib/playwright/executor";
 import type { A11yReport } from "@/lib/playwright/a11y";
 import { Badge } from "@/components/ui/badge";
@@ -185,6 +189,8 @@ export async function RunDetail({ run, sampleBanner = false }: RunDetailProps) {
         initialA11y={a11yReport}
         overview={overview}
         codePreview={codePreview}
+        liveExecutionAvailable={isLiveExecutionAvailable()}
+        unavailableMessage={LIVE_EXECUTION_UNAVAILABLE_MESSAGE}
       />
     </div>
   );

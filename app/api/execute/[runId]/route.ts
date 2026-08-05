@@ -10,6 +10,10 @@ import { launchBrowser } from "@/lib/playwright/browser";
 import { executeTestCase, type TestCaseResult } from "@/lib/playwright/executor";
 import { runAccessibilityAudit } from "@/lib/playwright/a11y";
 import { MAX_LIVE_CASES } from "@/lib/constants";
+import {
+  isLiveExecutionAvailable,
+  LIVE_EXECUTION_UNAVAILABLE_MESSAGE,
+} from "@/lib/execution-availability";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -81,6 +85,13 @@ export async function GET(
   const { runId } = await params;
   const { userId } = await auth();
 
+  // Refuse up front on deployments that can't launch a browser, so a caller
+  // gets a clear explanation instead of a module-resolution stack trace once
+  // launchBrowser() fails mid-stream.
+  if (!isLiveExecutionAvailable()) {
+    return new Response(LIVE_EXECUTION_UNAVAILABLE_MESSAGE, { status: 503 });
+  }
+
   const run = await prisma.testRun.findUnique({ where: { id: runId } });
   if (!run) {
     return new Response("Run not found", { status: 404 });
@@ -97,6 +108,13 @@ export async function GET(
     return new Response("Stored spec is invalid", { status: 500 });
   }
   const spec = parsed.data;
+
+  // Captured before execution starts: a run that already has results keeps its
+  // COMPLETED status if a later re-run crashes, rather than one bad re-run
+  // permanently poisoning the record of a good one. Matters most for the public
+  // /sample run, where a visitor's failed execution would otherwise turn the
+  // status badge red for everyone after them.
+  const hadPriorResults = run.executionLog !== null;
 
   const encoder = new TextEncoder();
   let browser: Browser | undefined;
@@ -196,9 +214,11 @@ export async function GET(
             error: err instanceof Error ? err.message : "Execution failed",
           })
         );
-        await prisma.testRun
-          .update({ where: { id: runId }, data: { status: "FAILED" } })
-          .catch(() => {});
+        if (!hadPriorResults) {
+          await prisma.testRun
+            .update({ where: { id: runId }, data: { status: "FAILED" } })
+            .catch(() => {});
+        }
       } finally {
         req.signal.removeEventListener("abort", onAbort);
         await browser?.close();

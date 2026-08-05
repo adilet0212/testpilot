@@ -2,12 +2,35 @@ import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // @axe-core/playwright reads axe-core's raw UMD bundle from disk and injects
-  // it verbatim into the browser page. Letting webpack/Turbopack bundle that
-  // source rewrites its `typeof module` guards and breaks it in-browser
-  // ("ReferenceError: module is not defined") — keep both packages external
-  // so Node's native require loads the file unmodified.
-  serverExternalPackages: ["@axe-core/playwright", "axe-core"],
+  // These packages all read files off disk at runtime rather than through
+  // statically-analyzable requires, so the bundler must leave them alone:
+  //   - axe-core / @axe-core/playwright: its raw UMD bundle gets injected
+  //     verbatim into the page; bundling rewrites the `typeof module` guards
+  //     and breaks it in-browser ("ReferenceError: module is not defined").
+  //   - playwright-core: reads browsers.json and its lib/ tree at launch.
+  //   - @sparticuz/chromium: unpacks the chromium binary itself.
+  serverExternalPackages: [
+    "@axe-core/playwright",
+    "axe-core",
+    "playwright-core",
+    "@sparticuz/chromium",
+  ],
+
+  // Declaring them external stops the bundler mangling them, but Vercel's file
+  // tracer still has to physically ship the files. Force-include the whole
+  // package for every route that launches a browser.
+  outputFileTracingIncludes: {
+    "/api/execute/[runId]": [
+      "./node_modules/.pnpm/playwright-core@*/node_modules/playwright-core/**",
+    ],
+    "/api/scrape": [
+      "./node_modules/.pnpm/playwright-core@*/node_modules/playwright-core/**",
+    ],
+    // The generate pipeline runs as a server action on the dashboard route.
+    "/dashboard": [
+      "./node_modules/.pnpm/playwright-core@*/node_modules/playwright-core/**",
+    ],
+  },
 };
 
 export default withSentryConfig(nextConfig, {
