@@ -14,13 +14,18 @@
  *
  * Resolution order:
  *   1. LIVE_EXECUTION_ENABLED=true|false — explicit override, always wins.
- *   2. Otherwise: available when a local Chromium binary is configured, which
- *      is true in local dev and false on the serverless deployment.
+ *   2. On Vercel: unavailable. Deliberately not inferred from anything else —
+ *      a PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH copied up from a local .env is a
+ *      Windows path that means nothing on Vercel's Linux runtime, and trusting
+ *      it would re-enable a button that always fails. Safe by default; set the
+ *      override to true if you get a browser runtime working there.
+ *   3. Otherwise: available when a local Chromium binary is configured.
  */
 export function isLiveExecutionAvailable(): boolean {
   const override = process.env.LIVE_EXECUTION_ENABLED;
   if (override === "true") return true;
   if (override === "false") return false;
+  if (process.env.VERCEL) return false;
   return Boolean(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH);
 }
 
